@@ -1,6 +1,9 @@
 package org.apache.hadoop.mapred;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class ResourcePolicyVariable extends ResourcePolicy {
+    public static final Log LOG = LogFactory.getLog(ResourcePolicyVariable.class);
     public ResourcePolicyVariable(MesosScheduler scheduler) {
       super(scheduler);
     }
