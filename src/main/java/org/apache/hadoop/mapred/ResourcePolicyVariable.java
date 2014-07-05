@@ -1,9 +1,6 @@
 package org.apache.hadoop.mapred;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 public class ResourcePolicyVariable extends ResourcePolicy {
-    public static final Log LOG = LogFactory.getLog(ResourcePolicyVariable.class);
     public ResourcePolicyVariable(MesosScheduler scheduler) {
       super(scheduler);
     }
@@ -25,7 +22,6 @@ public class ResourcePolicyVariable extends ResourcePolicy {
 
       // Is this offer too small for even the minimum slots?
       if (slots < 1) {
-        LOG.info("Offer is too small");
         return false;
       }
 

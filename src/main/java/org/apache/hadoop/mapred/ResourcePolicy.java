@@ -265,6 +265,8 @@ public class ResourcePolicy {
         double taskMem = (mapSlots + reduceSlots) * slotMem + containerMem;
         double taskDisk = (mapSlots + reduceSlots) * slotDisk + containerDisk;
 
+        LOG.info("PORTS: " + ports.size());
+
         if (!sufficient || ports.size() < 2) {
           LOG.info(join("\n", Arrays.asList(
               "Declining offer with insufficient resources for a TaskTracker: ",
