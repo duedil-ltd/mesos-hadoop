@@ -25,7 +25,7 @@ public class ResourcePolicyVariable extends ResourcePolicy {
 
       // Is this offer too small for even the minimum slots?
       if (slots < 1) {
-        LOG.info("Offer is too small")
+        LOG.info("Offer is too small");
         return false;
       }
 
