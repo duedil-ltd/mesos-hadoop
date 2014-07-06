@@ -20,6 +20,10 @@ public class ResourcePolicyVariable extends ResourcePolicy {
       mapSlots = 0;
       reduceSlots = 0;
 
+      LOG.info("CPUS: " + cpus);
+      LOG.info("Mem: " + mem);
+      LOG.info("Disk: " + disk);
+
       LOG.info("Map slots: " + mapSlots);
       LOG.info("Reduce slots: " + reduceSlots);
 
