@@ -261,9 +261,9 @@ public class ResourcePolicy {
 
         final boolean sufficient = computeSlots();
 
-        double taskCpus = (mapSlots + reduceSlots) * slotCpus + containerCpus;
-        double taskMem = (mapSlots + reduceSlots) * slotMem + containerMem;
-        double taskDisk = (mapSlots + reduceSlots) * slotDisk + containerDisk;
+        double taskCpus = ((mapSlots + reduceSlots) * slotCpus) + containerCpus;
+        double taskMem = ((mapSlots + reduceSlots) * slotMem) + containerMem;
+        double taskDisk = ((mapSlots + reduceSlots) * slotDisk) + containerDisk;
 
         if (!sufficient || ports.size() < 2) {
           LOG.info(join("\n", Arrays.asList(
