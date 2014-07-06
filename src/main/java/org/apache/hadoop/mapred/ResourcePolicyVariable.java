@@ -20,13 +20,25 @@ public class ResourcePolicyVariable extends ResourcePolicy {
       mapSlots = 0;
       reduceSlots = 0;
 
+      LOG.info("Map slots: " + mapSlots);
+      LOG.info("Reduce slots: " + reduceSlots);
+
+      LOG.info("Task CPU: " + slotCpus);
+      LOG.info("Container CPU: " + containerCpus);
+
+      LOG.info("Task Mem: " + slotMem);
+      LOG.info("Container Mem: " + containerMem);
+
+      LOG.info("Task Disk: " + slotDisk);
+      LOG.info("Container Disk: " + containerDisk);
+
       // Determine how many slots we can allocate.
       int slots = mapSlotsMax + reduceSlotsMax;
       slots = (int) Math.min(slots, (cpus - containerCpus) / slotCpus);
       slots = (int) Math.min(slots, (mem - containerMem) / slotMem);
       slots = (int) Math.min(slots, (disk - containerDisk) / slotDisk);
 
-      LOG.info("Possible to allocate " + slots + "slots");
+      LOG.info("Possible to allocate " + slots + " slots");
 
       // Is this offer too small for even the minimum slots?
       if (slots < 1) {
