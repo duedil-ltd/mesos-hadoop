@@ -432,6 +432,15 @@ public class ResourcePolicy {
 
         byte[] bytes = baos.toByteArray();
 
+        LOG.info("Task CPU: " + taskCpus);
+        LOG.info("Container CPU: " + containerCpus);
+
+        LOG.info("Task Mem: " + taskMem);
+        LOG.info("Container Mem: " + containerMem);
+
+        LOG.info("Task Disk: " + taskDisk);
+        LOG.info("Container Disk: " + containerDisk);
+
         TaskInfo info = TaskInfo
             .newBuilder()
             .setName(taskId.getValue())
