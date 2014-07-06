@@ -1,6 +1,12 @@
 package org.apache.hadoop.mapred;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 public class ResourcePolicyVariable extends ResourcePolicy {
+
+    public static final Log LOG = LogFactory.getLog(ResourcePolicyVariable.class);
+
     public ResourcePolicyVariable(MesosScheduler scheduler) {
       super(scheduler);
     }
@@ -19,6 +25,8 @@ public class ResourcePolicyVariable extends ResourcePolicy {
       slots = (int) Math.min(slots, (cpus - containerCpus) / slotCpus);
       slots = (int) Math.min(slots, (mem - containerMem) / slotMem);
       slots = (int) Math.min(slots, (disk - containerDisk) / slotDisk);
+
+      LOG.info("Possible to allocate " + slots + "slots");
 
       // Is this offer too small for even the minimum slots?
       if (slots < 1) {

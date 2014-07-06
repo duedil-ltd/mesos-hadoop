@@ -23,10 +23,13 @@ public class ResourcePolicyFixed extends ResourcePolicy {
     slots = (int) Math.min(slots, (mem - containerMem) / slotMem);
     slots = (int) Math.min(slots, (disk - containerDisk) / slotDisk);
 
+    LOG.info("Possible to allocate " + slots + "slots");
+
     // Is this offer too small for even the minimum slots?
     if (slots < mapSlots + reduceSlots || slots < 1) {
       return false;
     }
+
     return true;
   }
 }
