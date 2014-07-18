@@ -319,7 +319,7 @@ public class ResourcePolicy {
                 Protos.Environment.Variable.newBuilder()
                     .setName("HADOOP_HEAPSIZE")
                     // .setValue("" + tasktrackerJVMHeap));
-                    .setValue("20000m"));
+                    .setValue("20000"));
 
         // Set java specific environment, appropriately.
         Map<String, String> env = System.getenv();
