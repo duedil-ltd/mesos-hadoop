@@ -401,16 +401,13 @@ public class ResourcePolicy {
             reportAddress.getHostName() + ':' + reportAddress.getPort());
 
         overrides.set("mapred.child.java.opts",
-            scheduler.conf.get("mapred.child.java.opts") +
-                " -XX:+UseParallelGC -Xmx" + slotJVMHeap + "m -Xms" + slotJVMHeap + "m");
+            "-XX:+UseParallelGC -Xmx" + slotJVMHeap + "m -Xms" + slotJVMHeap + "m");
 
         overrides.set("mapred.map.child.java.opts",
-            scheduler.conf.get("mapred.map.child.java.opts") +
-                " -XX:+UseParallelGC -Xmx" + slotJVMHeap + "m -Xms" + slotJVMHeap + "m");
+            "-XX:+UseParallelGC -Xmx" + slotJVMHeap + "m -Xms" + slotJVMHeap + "m");
 
         overrides.set("mapred.reduce.child.java.opts",
-            scheduler.conf.get("mapred.reduce.child.java.opts") +
-                " -XX:+UseParallelGC -Xmx" + slotJVMHeap + "m -Xms" + slotJVMHeap + "m");
+            "-XX:+UseParallelGC -Xmx" + slotJVMHeap + "m -Xms" + slotJVMHeap + "m");
 
         overrides.setLong("mapred.tasktracker.map.tasks.maximum",
             mapSlots);
