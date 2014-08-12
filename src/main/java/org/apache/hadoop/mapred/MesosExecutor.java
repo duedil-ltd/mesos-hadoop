@@ -28,8 +28,7 @@ public class MesosExecutor implements Executor {
     JobConf conf = new JobConf(false);
     try {
       byte[] bytes = task.getData().toByteArray();
-      LOG.info("RAW XML Configuration received:\n" +
-                org.apache.mesos.hadoop.Utils.formatXml(new String(bytes)));
+      LOG.info("RAW XML Configuration received:\n" + new String(bytes));
       conf.readFields(new DataInputStream(new ByteArrayInputStream(bytes)));
     } catch (Exception e) {
       LOG.warn("Failed to deserialize configuraiton.", e);
