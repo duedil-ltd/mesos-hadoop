@@ -31,7 +31,7 @@ public class MesosExecutor implements Executor {
       LOG.info("RAW XML Configuration received:\n" +
                 org.apache.mesos.hadoop.Utils.formatXml(new String(bytes)));
       conf.readFields(new DataInputStream(new ByteArrayInputStream(bytes)));
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.warn("Failed to deserialize configuraiton.", e);
       System.exit(1);
     }
