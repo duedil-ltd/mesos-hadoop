@@ -239,19 +239,41 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
     // Let the underlying task scheduler do the actual task scheduling.
     List<Task> tasks = taskScheduler.assignTasks(taskTracker);
 
-    for (MesosTracker mesosTracker : mesosTrackers.values()) {
-      if (mesosTracker.host.getHostName().startsWith(taskTracker.getStatus().getHost())) {
-        LOG.info("HAR HAR" + mesosTracker.conf.get("mapred.child.java.opts"));
-      }
-    }
-
     // The Hadoop Fair Scheduler is known to return null.
     if (tasks == null) {
       return null;
     }
 
+    Configuration taskTrackerConf = null;
+    for (MesosTracker mesosTracker : mesosTrackers.values()) {
+      if (mesosTracker.host.getHostName().startsWith(taskTracker.getStatus().getHost())) {
+        taskTrackerConf = mesosTracker.conf;
+        break;
+      }
+    }
+
+    // Figure out which configuration options have changed for this task tracker
+    Configuration taskTrackerTaskConf = new Configuration();
+    for (Map.Entry<String, String> entry : conf) {
+      if (entry.getValue() != taskTrackerConf.getRaw(entry.getKey())) {
+        taskTrackerTaskConf.set(entry.getKey(), taskTrackerConf.getRaw(entry.getKey()));
+      }
+    }
+
     // Keep track of which TaskTracker contains which tasks.
     for (Task task : tasks) {
+
+      if (taskTrackerTaskConf != null) {
+        Configuration taskConf = task.getConf();
+        for (Map.Entry<String, String> entry : taskTrackerTaskConf) {
+          taskConf.set(entry.getKey(), entry.getValue());
+          LOG.info("Updating task with TaskTracker conf key: " + entry.getKey());
+        }
+      }
+      else {
+        LOG.info("Unable to locate mesos tracker configuration for task tracker");
+      }
+
       if (mesosTrackers.containsKey(tracker)) {
         mesosTrackers.get(tracker).jobs.add(task.getJobID());
       } else {
