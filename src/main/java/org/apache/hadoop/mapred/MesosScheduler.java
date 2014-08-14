@@ -267,7 +267,7 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
         Configuration taskConf = task.getConf();
         for (Map.Entry<String, String> entry : taskTrackerTaskConf) {
           taskConf.set(entry.getKey(), entry.getValue());
-          LOG.info("Updating task with TaskTracker conf key: " + entry.getKey());
+          // LOG.info("Updating task with TaskTracker conf key: " + entry.getKey());
         }
       }
       else {
