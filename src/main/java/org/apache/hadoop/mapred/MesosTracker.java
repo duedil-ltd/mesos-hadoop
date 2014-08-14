@@ -5,6 +5,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mesos.Protos.TaskID;
 
+import org.apache.hadoop.conf.Configuration;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -24,17 +26,19 @@ public class MesosTracker {
   public long reduceSlots;
   public volatile boolean active = false; // Set once tracked by the JobTracker.
   public volatile MesosScheduler scheduler;
+  public Configuration conf;
   // Tracks Hadoop jobs running on the tracker.
   public Set<JobID> jobs = Collections.newSetFromMap(new ConcurrentHashMap<JobID, Boolean>());
   public com.codahale.metrics.Timer.Context context;
 
   public MesosTracker(HttpHost host, TaskID taskId, long mapSlots,
-                      long reduceSlots, MesosScheduler scheduler) {
+                      long reduceSlots, MesosScheduler scheduler, Configuration conf) {
     this.host = host;
     this.taskId = taskId;
     this.mapSlots = mapSlots;
     this.reduceSlots = reduceSlots;
     this.scheduler = scheduler;
+    this.conf = conf;
     if (scheduler.metrics != null) {
       this.context = scheduler.metrics.trackerTimer.time();
     }

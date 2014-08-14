@@ -239,6 +239,12 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
     // Let the underlying task scheduler do the actual task scheduling.
     List<Task> tasks = taskScheduler.assignTasks(taskTracker);
 
+    for (MesosTracker mesosTracker : mesosTrackers.values()) {
+      if (mesosTracker.host.getHostName().startsWith(taskTracker.getStatus().getHost())) {
+        LOG.info("HAR HAR" + mesosTracker.conf.get("mapred.child.java.opts"));
+      }
+    }
+
     // The Hadoop Fair Scheduler is known to return null.
     if (tasks == null) {
       return null;

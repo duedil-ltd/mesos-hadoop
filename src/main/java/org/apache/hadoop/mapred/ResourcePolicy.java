@@ -308,10 +308,6 @@ public class ResourcePolicy {
         LOG.info("Launching task " + taskId.getValue() + " on "
             + httpAddress.toString() + " with mapSlots=" + mapSlots + " reduceSlots=" + reduceSlots);
 
-        // Add this tracker to Mesos tasks.
-        scheduler.mesosTrackers.put(httpAddress, new MesosTracker(httpAddress, taskId,
-            mapSlots, reduceSlots, scheduler));
-
         // Set up the environment for running the TaskTracker.
         Protos.Environment.Builder envBuilder = Protos.Environment
             .newBuilder()
@@ -425,6 +421,10 @@ public class ResourcePolicy {
         }
 
         byte[] bytes = baos.toByteArray();
+
+        // Add this tracker to Mesos tasks.
+        scheduler.mesosTrackers.put(httpAddress, new MesosTracker(httpAddress, taskId,
+            mapSlots, reduceSlots, scheduler, overrides));
 
         TaskInfo info = TaskInfo
             .newBuilder()
