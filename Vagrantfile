@@ -16,8 +16,7 @@ echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" | \
 
 # Update package list and install Mesos/JDK/Maven
 sudo apt-get -y update
-#sudo apt-get -y install mesos=1.1.0-2.0.107.debian81 maven default-jdk git apt-transport-https
-sudo apt-get -y install mesos=0.23.1-0.2.61.debian81 maven default-jdk git apt-transport-https
+sudo apt-get -y install mesos=1.1.0-2.0.107.debian81 maven default-jdk git apt-transport-https
 
 # Set Mesos IP/containerizer instance
 sudo bash -c "echo 192.168.33.50 > /etc/mesos-master/ip"
