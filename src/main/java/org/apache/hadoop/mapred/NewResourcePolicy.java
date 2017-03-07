@@ -1,24 +1,43 @@
 package org.apache.hadoop.mapred;
 
+import com.google.protobuf.ByteString;
+
 import org.apache.commons.httpclient.HttpHost;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.*;
 import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.v1.scheduler.Protos.Call;
 import org.apache.mesos.SchedulerDriver;
-import com.google.protobuf.ByteString;
+import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.Resource;
+import static org.apache.mesos.v1.Protos.Value.Type.SCALAR;
+import static org.apache.mesos.v1.Protos.Value.Type.RANGES;
+import org.apache.mesos.v1.Protos.Value.Range;
+import org.apache.mesos.v1.Protos.Value.Ranges;
+import org.apache.mesos.v1.Protos.Value.Scalar;
 
-import java.io.*;
-import java.util.*;
+import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.decline;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.apache.hadoop.util.StringUtils.join;
 
-public class ResourcePolicy {
-  public static final Log LOG = LogFactory.getLog(ResourcePolicy.class);
+public class NewResourcePolicy {
+  public static final Log LOG = LogFactory.getLog(NewResourcePolicy.class);
   public volatile MesosScheduler scheduler;
   public int neededMapSlots;
   public int neededReduceSlots;
@@ -39,7 +58,7 @@ public class ResourcePolicy {
   double mem;
   double disk;
 
-  public ResourcePolicy(MesosScheduler scheduler) {
+  public NewResourcePolicy(MesosScheduler scheduler) {
     this.scheduler = scheduler;
 
     mapSlotsMax = scheduler.conf.getInt("mapred.tasktracker.map.tasks.maximum",
@@ -199,8 +218,7 @@ public class ResourcePolicy {
     return false;
   }
 
-  public void resourceOffers(SchedulerDriver schedulerDriver,
-                             List<Offer> offers) {
+  public Call resourceOffers(FrameworkID frameworkId, List<Offer> offers) {
     final HttpHost jobTrackerAddress =
         new HttpHost(scheduler.jobTracker.getHostname(), scheduler.jobTracker.getTrackerPort());
 
@@ -215,9 +233,12 @@ public class ResourcePolicy {
       computeNeededSlots(jobsInProgress, taskTrackers);
 
       // Launch TaskTrackers to satisfy the slot requirements.
-      for (Offer offer : offers) {
+      offers.stream()
+              .filter()
+      .forEach(o -> {
         if (neededMapSlots <= 0 && neededReduceSlots <= 0) {
-          schedulerDriver.declineOffer(offer.getId());
+          // TODO stack up offers and decline all at once?
+          decline(frameworkId, offer.getId());
           continue;
         }
 
@@ -229,7 +250,7 @@ public class ResourcePolicy {
         mem = -1.0;
         disk = -1.0;
         Set<Integer> ports = new HashSet<Integer>();
-        String cpuRole = new String("*");
+        String cpuRole = "*";
         String memRole = cpuRole;
         String diskRole = cpuRole;
         String portsRole = cpuRole;
@@ -237,21 +258,21 @@ public class ResourcePolicy {
         // Pull out the cpus, memory, disk, and 2 ports from the offer.
         for (Resource resource : offer.getResourcesList()) {
           if (resource.getName().equals("cpus")
-              && resource.getType() == Value.Type.SCALAR) {
+              && resource.getType() == SCALAR) {
             cpus = resource.getScalar().getValue();
             cpuRole = resource.getRole();
           } else if (resource.getName().equals("mem")
-              && resource.getType() == Value.Type.SCALAR) {
+              && resource.getType() == SCALAR) {
             mem = resource.getScalar().getValue();
             memRole = resource.getRole();
           } else if (resource.getName().equals("disk")
-              && resource.getType() == Value.Type.SCALAR) {
+              && resource.getType() == SCALAR) {
             disk = resource.getScalar().getValue();
             diskRole = resource.getRole();
           } else if (resource.getName().equals("ports")
-              && resource.getType() == Value.Type.RANGES) {
+              && resource.getType() == RANGES) {
             portsRole = resource.getRole();
-            for (Value.Range range : resource.getRanges().getRangeList()) {
+            for (Range range : resource.getRanges().getRangeList()) {
               Integer begin = (int) range.getBegin();
               Integer end = (int) range.getEnd();
               if (end < begin) {
@@ -276,7 +297,7 @@ public class ResourcePolicy {
               !portsRole.equals(expectedRole)) {
             LOG.info("Declining offer with invalid role " + expectedRole);
 
-            schedulerDriver.declineOffer(offer.getId());
+            decline(frameworkId, offer.getId());
             continue;
           }
         }
@@ -297,7 +318,7 @@ public class ResourcePolicy {
                   ? " less than 2 offered"
                   : " at least 2 (sufficient)"))));
 
-          schedulerDriver.declineOffer(offer.getId());
+          decline(frameworkId, offer.getId());
           continue;
         }
 
@@ -320,7 +341,7 @@ public class ResourcePolicy {
               "  disk: offered " + disk + " needed " + taskDisk,
               "  ports: " + ports)));
 
-          schedulerDriver.declineOffer(offer.getId());
+          decline(frameworkId, offer.getId());
           continue;
         }
 
@@ -406,12 +427,12 @@ public class ResourcePolicy {
 
           directory = new File(uri).getName().split("\\.")[0] + "*";
         } else if (!isUriSet) {
-	    LOG.info("mapred.mesos.executor.uri is not set, relying on configured 'mapred.mesos.executor.directory' for working Hadoop distribution");
+        LOG.info("mapred.mesos.executor.uri is not set, relying on configured 'mapred.mesos.executor.directory' for working Hadoop distribution");
         }
 
         String command = scheduler.conf.get("mapred.mesos.executor.command");
         if (command == null || command.equals("")) {
-          command = "env ; ./bin/hadoop org.apache.hadoop.mapred.MesosExecutor_Prev";
+          command = "env ; ./bin/hadoop org.apache.hadoop.mapred.MesosExecutor";
         }
 
         CommandInfo.Builder commandInfo = CommandInfo.newBuilder();
@@ -423,10 +444,10 @@ public class ResourcePolicy {
         }
 
         // Populate old-style ContainerInfo if needed
-//        String containerImage = scheduler.conf.get("mapred.mesos.container.image");
-//        if (containerImage != null && !containerImage.equals("")) {
-//          commandInfo.setContainer(org.apache.mesos.hadoop.Utils.buildContainerInfo(scheduler.conf));
-//        }
+        String containerImage = scheduler.conf.get("mapred.mesos.container.image");
+        if (containerImage != null && !containerImage.equals("")) {
+          commandInfo.setContainer(org.apache.mesos.hadoop.Utils.buildContainerInfo(scheduler.conf));
+        }
 
         // Create a configuration from the current configuration and
         // override properties as appropriate for the TaskTracker.
@@ -452,23 +473,23 @@ public class ResourcePolicy {
                 Resource
                     .newBuilder()
                     .setName("cpus")
-                    .setType(Value.Type.SCALAR)
+                    .setType(SCALAR)
                     .setRole(cpuRole)
                     .setScalar(Value.Scalar.newBuilder().setValue(containerCpus)))
             .addResources(
                 Resource
                     .newBuilder()
                     .setName("mem")
-                    .setType(Value.Type.SCALAR)
+                    .setType(SCALAR)
                     .setRole(memRole)
-                    .setScalar(Value.Scalar.newBuilder().setValue(containerMem)))
+                    .setScalar(Scalar.newBuilder().setValue(containerMem)))
             .addResources(
                 Resource
                     .newBuilder()
                     .setName("disk")
-                    .setType(Value.Type.SCALAR)
+                    .setType(SCALAR)
                     .setRole(diskRole)
-                    .setScalar(Value.Scalar.newBuilder().setValue(containerDisk)))
+                    .setScalar(Scalar.newBuilder().setValue(containerDisk)))
             .setCommand(commandInfo.build());
 
         // Add the docker container info if an image is specified
@@ -499,31 +520,31 @@ public class ResourcePolicy {
                 Resource
                     .newBuilder()
                     .setName("ports")
-                    .setType(Value.Type.RANGES)
+                    .setType(RANGES)
                     .setRole(portsRole)
                     .setRanges(
-                        Value.Ranges
+                        Ranges
                             .newBuilder()
-                            .addRange(Value.Range.newBuilder()
+                            .addRange(Range.newBuilder()
                                 .setBegin(httpAddress.getPort())
                                 .setEnd(httpAddress.getPort()))
-                            .addRange(Value.Range.newBuilder()
+                            .addRange(Range.newBuilder()
                                 .setBegin(reportAddress.getPort())
                                 .setEnd(reportAddress.getPort()))))
             .addResources(
                 Resource
                     .newBuilder()
                     .setName("cpus")
-                    .setType(Value.Type.SCALAR)
+                    .setType(SCALAR)
                     .setRole(cpuRole)
-                    .setScalar(Value.Scalar.newBuilder().setValue(taskCpus - containerCpus)))
+                    .setScalar(Scalar.newBuilder().setValue(taskCpus - containerCpus)))
             .addResources(
                 Resource
                     .newBuilder()
                     .setName("mem")
-                    .setType(Value.Type.SCALAR)
+                    .setType(SCALAR)
                     .setRole(memRole)
-                    .setScalar(Value.Scalar.newBuilder().setValue(taskMem - containerCpus)))
+                    .setScalar(Scalar.newBuilder().setValue(taskMem - containerCpus)))
             .setData(taskData)
             .setExecutor(executorBuilder.build())
             .build();
@@ -547,6 +568,7 @@ public class ResourcePolicy {
             + (neededReduceSlots > 0 ? neededReduceSlots + " reduce slots " : "")
             + "remaining");
       }
+    });
     }
   }
 }

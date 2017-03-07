@@ -1,28 +1,51 @@
 package org.apache.hadoop.mapred;
 
 import com.codahale.metrics.Meter;
+import com.mesosphere.mesos.rx.java.MesosClientBuilder;
+import com.mesosphere.mesos.rx.java.SinkOperation;
+import com.mesosphere.mesos.rx.java.SinkOperations;
+import com.mesosphere.mesos.rx.java.protobuf.ProtoUtils;
+import com.mesosphere.mesos.rx.java.protobuf.ProtobufMesosClientBuilder;
+import com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls;
+import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.subscribe;
+
 import org.apache.commons.httpclient.HttpHost;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
-import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.*;
-import org.apache.mesos.Scheduler;
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.FrameworkInfo;
+import org.apache.mesos.Protos.MasterInfo;
+import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.hadoop.Metrics;
+import org.apache.mesos.v1.scheduler.Protos.Call;
+import org.apache.mesos.v1.scheduler.Protos.Event;
+import org.apache.mesos.v1.Protos.TaskStatus;
+import org.apache.mesos.v1.Protos.TaskState;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.net.URI;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class MesosScheduler extends TaskScheduler implements Scheduler {
-  public static final Log LOG = LogFactory.getLog(MesosScheduler.class);
+import rx.Observable;
+
+public class NewMesosScheduler extends TaskScheduler {
+  public static final Log LOG = LogFactory.getLog(NewMesosScheduler.class);
 
   // This is the memory overhead for a jvm process. This needs to be added
   // to a jvm process's resource requirement, in addition to its heap size.
@@ -53,6 +76,7 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
 
   protected TaskScheduler taskScheduler;
   protected JobTracker jobTracker;
+  private FrameworkID frameworkId;
   protected Configuration conf;
   protected File stateFile;
   // Count of the launched trackers for TaskID generation.
@@ -89,7 +113,7 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
 
     @Override
     public void jobUpdated(JobChangeEvent event) {
-      synchronized (MesosScheduler.this) {
+      synchronized (NewMesosScheduler.this) {
         JobInProgress job = event.getJobInProgress();
 
         if (metrics != null) {
@@ -189,12 +213,67 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
         .setName("Hadoop: (RPC port: " + jobTracker.port + ","
                  + " WebUI port: " + jobTracker.infoPort + ")").build();
 
-      driver = new MesosSchedulerDriver(this, frameworkInfo, master);
-      driver.start();
-    } catch (Exception e) {
+      final URI mesosUri = URI.create(master);
+
+      final MesosClientBuilder<Call, Event> clientBuilder = ProtobufMesosClientBuilder.schedulerUsingProtos()
+        .mesosUri(mesosUri);
+
+      final Call subscribeCall = subscribe(FrameworkID.newBuilder().build(), frameworkInfo);
+
+      clientBuilder
+        .subscribe(subscribeCall)
+        .processStream(unicastEvents -> {
+          final Observable<Event> events = unicastEvents.share();
+
+          final Observable<Optional<SinkOperation<Call>>> subscribedLogger = events
+                  .filter(event -> event.getType() == Event.Type.SUBSCRIBED)
+                  .doOnNext(e -> {
+                    Event.Subscribed subbed = e.getSubscribed();
+                    LOG.info("Subscribed as " + subbed.getFrameworkId().getValue()
+                             + " with master " + subbed.getMasterInfo().toString());
+                    setFrameworkId(subbed.getFrameworkId());
+                  })
+                  .map(e -> Optional.empty());
+
+          final Observable<Optional<SinkOperation<Call>>> offerAcks = events
+                  .filter(event -> event.getType() == Event.Type.OFFERS)
+                  .map(event -> )
+                  .map(SinkOperations::create)
+                  .map(Optional::of);
+
+          final Observable<Optional<SinkOperation<Call>>> updateAcks = events
+                  .filter(event -> event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().hasUuid())
+                  .map(event -> statusUpdate(event.getUpdate().getStatus()))
+                  .map(SinkOperations::create)
+                  .map(Optional::of);
+
+          final Observable<Optional<SinkOperation<Call>>> messageLogger = events
+                  .filter(event -> event.getType() == Event.Type.MESSAGE)
+                  .doOnNext(e -> {
+                    Event.Message m = e.getMessage();
+                    LOG.info("Framework Message of " + m.getData().size() + " bytes"
+                            + " from executor " + m.getExecutorId().getValue()
+                            + " on agent " + m.getAgentId().getValue();
+                  })
+                  .map(e -> Optional.empty());
+
+          final Observable<Optional<SinkOperation<Call>>> errorLogger = events
+                  .filter(event -> event.getType() == Event.Type.ERROR || (event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().getState() == TaskState.TASK_ERROR))
+                  .doOnNext(e -> LOG.error("Error from scheduler driver: " + ProtoUtils.protoToString(e)))
+                  .map(e -> Optional.empty());
+
+          return updateAcks
+                  .mergeWith(messageLogger)
+                  .mergeWith(errorLogger)
+                  .mergeWith(subscribedLogger);
+        });
+
+      clientBuilder.build().openStream().await();
+
+    } catch (Throwable t) {
       // If the MesosScheduler can't be loaded, the JobTracker won't be useful
       // at all, so crash it now so that the user notices.
-      LOG.fatal("Failed to start MesosScheduler", e);
+      LOG.fatal("Failed to start MesosScheduler", t);
       System.exit(1);
     }
 
@@ -220,6 +299,10 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
     }
 
     taskScheduler.start();
+  }
+
+  public synchronized void setFrameworkId(FrameworkID frameworkId) {
+    this.frameworkId = frameworkId;
   }
 
   @Override
@@ -300,13 +383,6 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
   // state across our Scheduler and TaskScheduler implementations, and provide
   // atomic operations as needed.
   @Override
-  public synchronized void registered(SchedulerDriver schedulerDriver,
-                                      FrameworkID frameworkID, MasterInfo masterInfo) {
-    LOG.info("Registered as " + frameworkID.getValue()
-        + " with master " + masterInfo);
-  }
-
-  @Override
   public synchronized void reregistered(SchedulerDriver schedulerDriver,
                                         MasterInfo masterInfo) {
     LOG.info("Re-registered with master " + masterInfo);
@@ -368,14 +444,12 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
   }
 
   @Override
-  public synchronized void offerRescinded(SchedulerDriver schedulerDriver,
+  public synchronized Call offerRescinded(SchedulerDriver schedulerDriver,
                                           OfferID offerID) {
     LOG.warn("Rescinded offer: " + offerID.getValue());
   }
 
-  @Override
-  public synchronized void statusUpdate(SchedulerDriver schedulerDriver,
-                                        Protos.TaskStatus taskStatus) {
+  public synchronized Call statusUpdate(TaskStatus taskStatus) {
     LOG.info("Status update of " + taskStatus.getTaskId().getValue()
         + " to " + taskStatus.getState().name()
         + " with message " + taskStatus.getMessage());
@@ -414,6 +488,8 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
         meter.mark();
       }
     }
+
+    SchedulerCalls.ackUpdate(this.frameworkId, taskStatus.getUuid(), taskStatus.getAgentId(), taskStatus.getTaskId());
   }
 
   @Override
