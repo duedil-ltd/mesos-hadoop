@@ -8,19 +8,20 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.v1.scheduler.Protos.Call;
-import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.v1.Protos.TaskID;
+import org.apache.mesos.v1.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos.CommandInfo;
+import org.apache.mesos.v1.Protos.Environment;
+import org.apache.mesos.v1.Protos.Environment.Variable;
+import org.apache.mesos.v1.Protos.ExecutorInfo;
 import org.apache.mesos.v1.Protos.FrameworkID;
 import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.OfferID;
 import org.apache.mesos.v1.Protos.Resource;
-import static org.apache.mesos.v1.Protos.Value.Type.SCALAR;
-import static org.apache.mesos.v1.Protos.Value.Type.RANGES;
 import org.apache.mesos.v1.Protos.Value.Range;
 import org.apache.mesos.v1.Protos.Value.Ranges;
 import org.apache.mesos.v1.Protos.Value.Scalar;
-
-import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.decline;
+import org.apache.mesos.v1.scheduler.Protos.Call;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -33,30 +34,31 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.decline;
 import static org.apache.hadoop.util.StringUtils.join;
+import static org.apache.mesos.v1.Protos.Value.Type.RANGES;
+import static org.apache.mesos.v1.Protos.Value.Type.SCALAR;
 
 public class NewResourcePolicy {
-  public static final Log LOG = LogFactory.getLog(NewResourcePolicy.class);
-  public volatile MesosScheduler scheduler;
-  public int neededMapSlots;
-  public int neededReduceSlots;
-  public long slots, mapSlots, reduceSlots;
-  public int mapSlotsMax, reduceSlotsMax;
-  double slotCpus;
-  double slotDisk;
-  int slotMem;
-  long slotJVMHeap;
-  int tasktrackerMem;
-  long tasktrackerJVMHeap;
+  private static final Log LOG = LogFactory.getLog(NewResourcePolicy.class);
+  private volatile MesosScheduler scheduler;
+  private int neededMapSlots;
+  private int neededReduceSlots;
+  private long slots, mapSlots, reduceSlots;
+  private int mapSlotsMax, reduceSlotsMax;
+  private double slotCpus;
+  private double slotDisk;
+  private int slotMem;
+  private long slotJVMHeap;
+  private int tasktrackerMem;
+  private long tasktrackerJVMHeap;
   // Minimum resource requirements for the container (TaskTracker + map/red
   // tasks).
-  double containerCpus;
-  double containerMem;
-  double containerDisk;
-  double cpus;
-  double mem;
-  double disk;
+  private double containerCpus;
+  private double containerMem;
+  private double containerDisk;
 
   public NewResourcePolicy(MesosScheduler scheduler) {
     this.scheduler = scheduler;
@@ -211,6 +213,77 @@ public class NewResourcePolicy {
     }
   }
 
+  /**
+   * Checks extracted resource roles against mapred.mesos.role,
+   * if mapred.mesos.role.strict is set.
+   *
+   * @param resources Set of resources offered to the task
+   * @return true if role is valid, false otherwise
+   */
+  private boolean invalidRole(ResourceSet resources) {
+    if (scheduler.conf.getBoolean("mapred.mesos.role.strict", false)) {
+      String expectedRole = scheduler.conf.get("mapred.mesos.role", "*");
+      if (!resources.cpuRole().equals(expectedRole) ||
+          !resources.memRole().equals(expectedRole) ||
+          !resources.diskRole().equals(expectedRole) ||
+          !resources.portsRole().equals(expectedRole)) {
+        LOG.info("Declining offer with invalid role " + expectedRole);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean insufficientResources(ResourceSet resources) {
+    final boolean sufficient = computeSlots();
+
+    double taskCpus = (mapSlots + reduceSlots) * slotCpus + containerCpus;
+    double taskMem = (mapSlots + reduceSlots) * slotMem + containerMem;
+    double taskDisk = (mapSlots + reduceSlots) * slotDisk + containerDisk;
+
+    if (!sufficient || resources.ports().size() < 2) {
+      LOG.info(join("\n", Arrays.asList(
+              "Declining offer with insufficient resources for a TaskTracker: ",
+              "  cpus: offered " + resources.cpus() + " needed at least " + taskCpus,
+              "  mem : offered " + resources.mem() + " needed at least " + taskMem,
+              "  disk: offered " + resources.disk() + " needed at least " + taskDisk,
+              "  ports: " + (resources.ports().size() < 2
+                      ? " less than 2 offered"
+                      : " at least 2 (sufficient)"))));
+      return true;
+    }
+    return false;
+  }
+
+  private boolean isPortOccupied(Offer offer, ResourceSet resources) {
+    Iterator<Integer> portIter = resources.ports().iterator();
+    HttpHost httpAddress = new HttpHost(offer.getHostname(), portIter.next());
+    HttpHost reportAddress = new HttpHost(offer.getHostname(), portIter.next());
+
+    double taskCpus = (mapSlots + reduceSlots) * slotCpus + containerCpus;
+    double taskMem = (mapSlots + reduceSlots) * slotMem + containerMem;
+    double taskDisk = (mapSlots + reduceSlots) * slotDisk + containerDisk;
+
+    // Check that this tracker is not already launched.  This problem was
+    // observed on a few occasions, but not reliably.  The main symptom was
+    // that entries in `mesosTrackers` were being lost, and task trackers
+    // would be 'lost' mysteriously (probably because the ports were in
+    // use).  This problem has since gone away with a rewrite of the port
+    // selection code, but the check + logging is left here.
+    // TODO(brenden): Diagnose this to determine root cause.
+    if (scheduler.mesosTrackers.containsKey(httpAddress)) {
+      LOG.info(join("\n", Arrays.asList(
+              "Declining offer because host/port combination is in use: ",
+              "  cpus: offered " + resources.cpus() + " needed at least " + taskCpus,
+              "  mem : offered " + resources.mem() + " needed at least " + taskMem,
+              "  disk: offered " + resources.disk() + " needed at least " + taskDisk,
+              "  ports: " + resources.ports())));
+
+      return true;
+    }
+    return false;
+  }
+
   // This method computes the number of slots to launch for this offer, and
   // returns true if the offer is sufficient.
   // Must be overridden.
@@ -233,120 +306,43 @@ public class NewResourcePolicy {
       computeNeededSlots(jobsInProgress, taskTrackers);
 
       // Launch TaskTrackers to satisfy the slot requirements.
-      offers.stream()
-              .filter()
-      .forEach(o -> {
-        if (neededMapSlots <= 0 && neededReduceSlots <= 0) {
-          // TODO stack up offers and decline all at once?
-          decline(frameworkId, offer.getId());
-          continue;
-        }
+      if (neededMapSlots <= 0 && neededReduceSlots <= 0) {
+        List<OfferID> offerIds = offers.stream()
+                .map(Offer::getId)
+                .collect(Collectors.toList());
+        decline(frameworkId, offerIds);
+      }
 
+      // consider inverting condition?
+      Map<Boolean, List<Offer>> offersByValidity = offers.stream()
+              .collect(Collectors.partitioningBy(o -> {
+                ResourceSet rs = ResourceSet.fromResources(o.getResourcesList());
+                return invalidRole(rs) ||
+                        insufficientResources(rs) ||
+                        isPortOccupied(o, rs);
+              }));
+
+      List<OfferID> invalidOfferIds = offersByValidity.get(true)
+              .stream()
+              .map(Offer::getId)
+              .collect(Collectors.toList());
+
+      decline(frameworkId, invalidOfferIds);
+
+      offersByValidity.get(false)
+              .stream();
+
+      for (Offer offer : offers) {
         // Ensure these values aren't < 0.
         neededMapSlots = Math.max(0, neededMapSlots);
         neededReduceSlots = Math.max(0, neededReduceSlots);
 
-        cpus = -1.0;
-        mem = -1.0;
-        disk = -1.0;
-        Set<Integer> ports = new HashSet<Integer>();
-        String cpuRole = "*";
-        String memRole = cpuRole;
-        String diskRole = cpuRole;
-        String portsRole = cpuRole;
-
-        // Pull out the cpus, memory, disk, and 2 ports from the offer.
-        for (Resource resource : offer.getResourcesList()) {
-          if (resource.getName().equals("cpus")
-              && resource.getType() == SCALAR) {
-            cpus = resource.getScalar().getValue();
-            cpuRole = resource.getRole();
-          } else if (resource.getName().equals("mem")
-              && resource.getType() == SCALAR) {
-            mem = resource.getScalar().getValue();
-            memRole = resource.getRole();
-          } else if (resource.getName().equals("disk")
-              && resource.getType() == SCALAR) {
-            disk = resource.getScalar().getValue();
-            diskRole = resource.getRole();
-          } else if (resource.getName().equals("ports")
-              && resource.getType() == RANGES) {
-            portsRole = resource.getRole();
-            for (Range range : resource.getRanges().getRangeList()) {
-              Integer begin = (int) range.getBegin();
-              Integer end = (int) range.getEnd();
-              if (end < begin) {
-                LOG.warn("Ignoring invalid port range: begin=" + begin + " end=" + end);
-                continue;
-              }
-              while (begin <= end && ports.size() < 2) {
-                int port = begin + (int)(Math.random() * ((end - begin) + 1));
-                ports.add(port);
-                begin += 1;
-              }
-            }
-          }
-        }
-
-        // Verify the resource roles are what we need
-        if (scheduler.conf.getBoolean("mapred.mesos.role.strict", false)) {
-          String expectedRole = scheduler.conf.get("mapred.mesos.role", "*");
-          if (!cpuRole.equals(expectedRole) ||
-              !memRole.equals(expectedRole) ||
-              !diskRole.equals(expectedRole) ||
-              !portsRole.equals(expectedRole)) {
-            LOG.info("Declining offer with invalid role " + expectedRole);
-
-            decline(frameworkId, offer.getId());
-            continue;
-          }
-        }
-
-        final boolean sufficient = computeSlots();
-
-        double taskCpus = (mapSlots + reduceSlots) * slotCpus + containerCpus;
-        double taskMem = (mapSlots + reduceSlots) * slotMem + containerMem;
-        double taskDisk = (mapSlots + reduceSlots) * slotDisk + containerDisk;
-
-        if (!sufficient || ports.size() < 2) {
-          LOG.info(join("\n", Arrays.asList(
-              "Declining offer with insufficient resources for a TaskTracker: ",
-              "  cpus: offered " + cpus + " needed at least " + taskCpus,
-              "  mem : offered " + mem + " needed at least " + taskMem,
-              "  disk: offered " + disk + " needed at least " + taskDisk,
-              "  ports: " + (ports.size() < 2
-                  ? " less than 2 offered"
-                  : " at least 2 (sufficient)"))));
-
-          decline(frameworkId, offer.getId());
-          continue;
-        }
-
-        Iterator<Integer> portIter = ports.iterator();
-        HttpHost httpAddress = new HttpHost(offer.getHostname(), portIter.next());
-        HttpHost reportAddress = new HttpHost(offer.getHostname(), portIter.next());
-
-        // Check that this tracker is not already launched.  This problem was
-        // observed on a few occasions, but not reliably.  The main symptom was
-        // that entries in `mesosTrackers` were being lost, and task trackers
-        // would be 'lost' mysteriously (probably because the ports were in
-        // use).  This problem has since gone away with a rewrite of the port
-        // selection code, but the check + logging is left here.
-        // TODO(brenden): Diagnose this to determine root cause.
-        if (scheduler.mesosTrackers.containsKey(httpAddress)) {
-          LOG.info(join("\n", Arrays.asList(
-              "Declining offer because host/port combination is in use: ",
-              "  cpus: offered " + cpus + " needed " + taskCpus,
-              "  mem : offered " + mem + " needed " + taskMem,
-              "  disk: offered " + disk + " needed " + taskDisk,
-              "  ports: " + ports)));
-
-          decline(frameworkId, offer.getId());
-          continue;
-        }
-
         TaskID taskId = TaskID.newBuilder()
             .setValue("Task_Tracker_" + scheduler.launchedTrackers++).build();
+
+        Iterator<Integer> portIter = resources.ports().iterator();
+        HttpHost httpAddress = new HttpHost(offer.getHostname(), portIter.next());
+        HttpHost reportAddress = new HttpHost(offer.getHostname(), portIter.next());
 
         LOG.info("Launching task " + taskId.getValue() + " on "
             + httpAddress.toString() + " with mapSlots=" + mapSlots + " reduceSlots=" + reduceSlots);
@@ -374,10 +370,10 @@ public class NewResourcePolicy {
         }
 
         // Set up the environment for running the TaskTracker.
-        Protos.Environment.Builder envBuilder = Protos.Environment
+        Environment.Builder envBuilder = Environment
             .newBuilder()
             .addVariables(
-                Protos.Environment.Variable.newBuilder()
+                Variable.newBuilder()
                     .setName("HADOOP_OPTS")
                     .setValue(
                         jvmOpts +
@@ -389,13 +385,13 @@ public class NewResourcePolicy {
         // Set java specific environment, appropriately.
         Map<String, String> env = System.getenv();
         if (env.containsKey("JAVA_HOME")) {
-          envBuilder.addVariables(Protos.Environment.Variable.newBuilder()
+          envBuilder.addVariables(Variable.newBuilder()
               .setName("JAVA_HOME")
               .setValue(env.get("JAVA_HOME")));
         }
 
         if (env.containsKey("JAVA_LIBRARY_PATH")) {
-          envBuilder.addVariables(Protos.Environment.Variable.newBuilder()
+          envBuilder.addVariables(Variable.newBuilder()
               .setName("JAVA_LIBRARY_PATH")
               .setValue(env.get("JAVA_LIBRARY_PATH")));
         }
@@ -475,7 +471,7 @@ public class NewResourcePolicy {
                     .setName("cpus")
                     .setType(SCALAR)
                     .setRole(cpuRole)
-                    .setScalar(Value.Scalar.newBuilder().setValue(containerCpus)))
+                    .setScalar(Scalar.newBuilder().setValue(containerCpus)))
             .addResources(
                 Resource
                     .newBuilder()
@@ -505,6 +501,7 @@ public class NewResourcePolicy {
         } catch (IOException e) {
           LOG.error("Caught exception serializing configuration");
 
+          // TODO
           // Skip this offer completely
           schedulerDriver.declineOffer(offer.getId());
           continue;
@@ -515,7 +512,7 @@ public class NewResourcePolicy {
             .newBuilder()
             .setName(taskId.getValue())
             .setTaskId(taskId)
-            .setSlaveId(offer.getSlaveId())
+            .setAgentId(offer.getAgentId())
             .addResources(
                 Resource
                     .newBuilder()
@@ -553,6 +550,7 @@ public class NewResourcePolicy {
         scheduler.mesosTrackers.put(httpAddress, new MesosTracker(httpAddress, taskId,
             mapSlots, reduceSlots, scheduler));
 
+        // TODO
         // Launch the task
         schedulerDriver.launchTasks(Arrays.asList(offer.getId()), Arrays.asList(trackerTaskInfo));
 
@@ -568,7 +566,109 @@ public class NewResourcePolicy {
             + (neededReduceSlots > 0 ? neededReduceSlots + " reduce slots " : "")
             + "remaining");
       }
-    });
     }
+  }
+}
+
+public class ResourceSet {
+  public static final Log LOG = LogFactory.getLog(ResourceSet.class);
+
+  private final double cpus;
+  private final double mem;
+  private final double disk;
+  private final Set<Integer> ports;
+  private final String cpuRole;
+  private final String memRole;
+  private final String diskRole;
+  private final String portsRole;
+
+  private ResourceSet(double cpus, double mem, double disk, Set<Integer> ports, String cpuRole,
+                      String memRole, String diskRole, String portsRole) {
+    this.cpus = cpus;
+    this.mem = mem;
+    this.disk = disk;
+    this.ports = ports;
+    this.cpuRole = cpuRole;
+    this.memRole = memRole;
+    this.diskRole = diskRole;
+    this.portsRole = portsRole;
+  }
+
+  public double cpus() {
+    return cpus;
+  }
+
+  public double mem() {
+    return mem;
+  }
+
+  public double disk() {
+    return disk;
+  }
+
+  public Set<Integer> ports() {
+    return ports;
+  }
+
+  public String cpuRole() {
+    return cpuRole;
+  }
+
+  public String memRole() {
+    return memRole;
+  }
+
+  public String diskRole() {
+    return diskRole;
+  }
+
+  public String portsRole() {
+    return portsRole;
+  }
+
+  public static ResourceSet fromResources(List<Resource> resources) {
+    double cpus = -1.0;
+    double mem = -1.0;
+    double disk = -1.0;
+    Set<Integer> ports = new HashSet<>();
+    String cpuRole = "*";
+    String memRole = cpuRole;
+    String diskRole = cpuRole;
+    String portsRole = cpuRole;
+
+    // Pull out the cpus, memory, disk, and 2 ports from the offer.
+    for (Resource resource : resources) {
+      if (resource.getName().equals("cpus")
+              && resource.getType() == SCALAR) {
+        cpus = resource.getScalar().getValue();
+        cpuRole = resource.getRole();
+      } else if (resource.getName().equals("mem")
+              && resource.getType() == SCALAR) {
+        mem = resource.getScalar().getValue();
+        memRole = resource.getRole();
+      } else if (resource.getName().equals("disk")
+              && resource.getType() == SCALAR) {
+        disk = resource.getScalar().getValue();
+        diskRole = resource.getRole();
+      } else if (resource.getName().equals("ports")
+              && resource.getType() == RANGES) {
+        portsRole = resource.getRole();
+        for (Range range : resource.getRanges().getRangeList()) {
+          Integer begin = (int) range.getBegin();
+          Integer end = (int) range.getEnd();
+          if (end < begin) {
+            LOG.warn("Ignoring invalid port range: begin=" + begin + " end=" + end);
+            continue;
+          }
+          while (begin <= end && ports.size() < 2) {
+            int port = begin + (int)(Math.random() * ((end - begin) + 1));
+            ports.add(port);
+            begin += 1;
+          }
+        }
+      }
+    }
+
+    return new ResourceSet(cpus, mem, disk, ports, cpuRole, memRole, diskRole, portsRole);
   }
 }
