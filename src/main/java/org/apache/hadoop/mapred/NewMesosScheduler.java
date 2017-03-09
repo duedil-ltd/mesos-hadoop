@@ -18,7 +18,7 @@ import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.v1.Protos.FrameworkID;
 import org.apache.mesos.v1.Protos.FrameworkInfo;
 import org.apache.mesos.Protos.MasterInfo;
-import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.v1.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.SchedulerDriver;
@@ -83,7 +83,7 @@ public class NewMesosScheduler extends TaskScheduler {
   protected long launchedTrackers = 0;
   // Use a fixed slot allocation policy?
   protected boolean policyIsFixed = false;
-  protected ResourcePolicy policy;
+  protected NewResourcePolicy policy;
 
   protected boolean enableMetrics = false;
   public Metrics metrics;
@@ -237,7 +237,7 @@ public class NewMesosScheduler extends TaskScheduler {
 
           final Observable<Optional<SinkOperation<Call>>> offerAcks = events
                   .filter(event -> event.getType() == Event.Type.OFFERS)
-                  .map(event -> )
+                  .flatMap(event -> resourceOffers(event.getOffers().getOffersList()).stream())
                   .map(SinkOperations::create)
                   .map(Optional::of);
 
@@ -257,6 +257,11 @@ public class NewMesosScheduler extends TaskScheduler {
                   })
                   .map(e -> Optional.empty());
 
+          final Observable<Optional<SinkOperation<Call>>> rescindedLogger = events
+                  .filter(event -> event.getType() == Event.Type.RESCIND)
+                  .doOnNext(e -> LOG.warn("Rescinded offer: " + e.getRescind().getOfferId().getValue()))
+                  .map(e -> Optional.empty());
+
           final Observable<Optional<SinkOperation<Call>>> errorLogger = events
                   .filter(event -> event.getType() == Event.Type.ERROR || (event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().getState() == TaskState.TASK_ERROR))
                   .doOnNext(e -> LOG.error("Error from scheduler driver: " + ProtoUtils.protoToString(e)))
@@ -265,7 +270,8 @@ public class NewMesosScheduler extends TaskScheduler {
           return updateAcks
                   .mergeWith(messageLogger)
                   .mergeWith(errorLogger)
-                  .mergeWith(subscribedLogger);
+                  .mergeWith(subscribedLogger)
+                  .mergeWith(rescindedLogger);
         });
 
       clientBuilder.build().openStream().await();
@@ -437,16 +443,8 @@ public class NewMesosScheduler extends TaskScheduler {
 
   // This method uses explicit synchronization in order to avoid deadlocks when
   // accessing the JobTracker.
-  @Override
-  public void resourceOffers(SchedulerDriver schedulerDriver,
-                             List<Offer> offers) {
-    policy.resourceOffers(schedulerDriver, offers);
-  }
-
-  @Override
-  public synchronized Call offerRescinded(SchedulerDriver schedulerDriver,
-                                          OfferID offerID) {
-    LOG.warn("Rescinded offer: " + offerID.getValue());
+  public List<Call> resourceOffers(List<Offer> offers) {
+    policy.resourceOffers(frameworkId, offers);
   }
 
   public synchronized Call statusUpdate(TaskStatus taskStatus) {
@@ -493,14 +491,6 @@ public class NewMesosScheduler extends TaskScheduler {
   }
 
   @Override
-  public synchronized void frameworkMessage(SchedulerDriver schedulerDriver,
-                                            ExecutorID executorID, SlaveID slaveID, byte[] bytes) {
-    LOG.info("Framework Message of " + bytes.length + " bytes"
-        + " from executor " + executorID.getValue()
-        + " on slave " + slaveID.getValue());
-  }
-
-  @Override
   public synchronized void disconnected(SchedulerDriver schedulerDriver) {
     LOG.warn("Disconnected from Mesos master.");
   }
@@ -516,10 +506,5 @@ public class NewMesosScheduler extends TaskScheduler {
                                         ExecutorID executorID, SlaveID slaveID, int status) {
     LOG.warn("Executor " + executorID.getValue()
         + " lost with status " + status + " on slave " + slaveID);
-  }
-
-  @Override
-  public synchronized void error(SchedulerDriver schedulerDriver, String s) {
-    LOG.error("Error from scheduler driver: " + s);
   }
 }
