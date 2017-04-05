@@ -469,7 +469,10 @@ public class ResourcePolicy {
                     .setType(Value.Type.SCALAR)
                     .setRole(diskRole)
                     .setScalar(Value.Scalar.newBuilder().setValue(containerDisk)))
-            .setCommand(commandInfo.build());
+            .setCommand(commandInfo.build())
+            ;
+
+
 
         // Add the docker container info if an image is specified
         String dockerImage = scheduler.conf.get("mapred.mesos.docker.image");
