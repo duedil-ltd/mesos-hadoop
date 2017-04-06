@@ -32,7 +32,7 @@ sleep 5
 # Download and extract Hadoop
 wget http://archive.cloudera.com/cdh5/cdh/5/hadoop-2.5.0-cdh5.2.0.tar.gz
 tar -zxvf hadoop-2.5.0-cdh5.2.0.tar.gz
-sudo mkdir /usr/local/hadoop-2.5.0
+sudo mkdir -p /usr/local/hadoop-2.5.0
 sudo chmod +w /usr/local/hadoop-2.5.0
 mv hadoop-2.5.0-cdh5.2.0/* /usr/local/hadoop-2.5.0
 rm hadoop-2.5.0-cdh5.2.0.tar.gz
@@ -62,7 +62,7 @@ rm mapreduce
 ln -s mapreduce1 mapreduce
 popd > /dev/null
 
-sudo mkdir /var/log/hadoop
+sudo mkdir -p /var/log/hadoop
 sudo chown vagrant /var/log/hadoop
 
 # ln hadoop conf files to appropriate locations
