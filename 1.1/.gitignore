@@ -1,6 +1,0 @@
-# IDE files
-*.iml
-.idea/
-
-#compiled files
-target/*
