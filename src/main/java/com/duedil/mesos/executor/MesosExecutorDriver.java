@@ -112,7 +112,6 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
             }
         } catch (IOException e) {
             LOG.error("Error while sending update: {}", e.getMessage());
-            backoff();
         }
 
         return Status.DRIVER_RUNNING;
