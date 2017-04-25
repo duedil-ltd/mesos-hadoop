@@ -66,13 +66,17 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
 
     @Override
     public Status stop() {
-        // TODO: kill all the things
+        for (TaskID task : unacknowledgedTasks.keySet()) {
+            executor.killTask(this, task);
+        }
         return Status.DRIVER_STOPPED;
     }
 
     @Override
     public Status abort() {
-        // TODO: kill all the things, perhaps differently
+        for (TaskID task : unacknowledgedTasks.keySet()) {
+            executor.killTask(this, task);
+        }
         return Status.DRIVER_ABORTED;
     }
 
