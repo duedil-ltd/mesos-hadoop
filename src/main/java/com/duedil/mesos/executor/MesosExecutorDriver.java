@@ -1,5 +1,6 @@
 package com.duedil.mesos.executor;
 
+import com.duedil.mesos.Utils.TimeConversion;
 import com.duedil.mesos.executor.api.MessageRequest;
 import com.duedil.mesos.executor.api.Requestable;
 import com.duedil.mesos.executor.api.UpdateRequest;
@@ -37,6 +38,9 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
     private static final String ENV_FRAMEWORK_ID = "MESOS_FRAMEWORK_ID";
     private static final String ENV_EXECUTOR_ID = "MESOS_EXECUTOR_ID";
     private static final String ENV_AGENT_ENDPOINT = "MESOS_AGENT_ENDPOINT";
+    private static final String ENV_EXECUTOR_SHUTDOWN_GRACE_PERIOD = "MESOS_EXECUTOR_SHUTDOWN_GRACE_PERIOD";
+    private static final String ENV_MESOS_CHECKPOINT = "MESOS_CHECKPOINT";
+    private static final String ENV_MESOS_LOCAL = "MESOS_LOCAL";
 
     private final Executor executor;
     private FrameworkInfo framework;
@@ -46,6 +50,9 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
     private final URI agentEndpoint;
     private final Map<TaskID, TaskInfo> unacknowledgedTasks;
     private final Map<ByteString, Update> unacknowledgedUpdates;
+    private final boolean mesosCheckpoint;
+    private final boolean mesosLocal;
+    private final long shutdownGracePeriod;
 
     public MesosExecutorDriver(Executor executor) {
         this.executor = checkNotNull(executor);
@@ -56,6 +63,15 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
         this.agentEndpoint = executorEndpoint(getEnvOrThrow(ENV_AGENT_ENDPOINT));
         this.unacknowledgedTasks = new HashMap<>();
         this.unacknowledgedUpdates = new HashMap<>();
+        this.mesosCheckpoint = Boolean.valueOf(System.getenv(ENV_MESOS_CHECKPOINT));
+        this.mesosLocal = Boolean.valueOf(System.getenv(ENV_MESOS_LOCAL));
+        String shutdownGracePeriod = System.getenv(ENV_EXECUTOR_SHUTDOWN_GRACE_PERIOD);
+        if (shutdownGracePeriod != null) {
+            this.shutdownGracePeriod = TimeConversion.getInstance().parseToMillis(shutdownGracePeriod);
+        }
+        else {
+            this.shutdownGracePeriod = 0;
+        }
     }
 
     @Override
