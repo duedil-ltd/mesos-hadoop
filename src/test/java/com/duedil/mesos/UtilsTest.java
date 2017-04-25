@@ -1,5 +1,6 @@
 package com.duedil.mesos;
 
+import com.duedil.mesos.Utils.TimeConversion;
 import org.junit.Test;
 
 import java.net.URI;
@@ -39,6 +40,42 @@ public class UtilsTest {
         String actual = getEnvOrThrow("MESOS_FROBNITZER");
     }
 
+    @Test
+    public void testTimeConversionHoldsAllUnits() {
+        TimeConversion tc = TimeConversion.getInstance();
+
+        long oneMili = 1;
+        long oneSec = oneMili * 1000;
+        long oneMin = oneSec * 60;
+        long oneHour = oneMin * 60;
+        long oneDay = oneHour * 24;
+        long oneWeek = oneDay * 7;
+
+        assertThat(tc.parseToMillis("1ms"), is(equalTo(oneMili)));
+        assertThat(tc.parseToMillis("1secs"), is(equalTo(oneSec)));
+        assertThat(tc.parseToMillis("1mins"), is(equalTo(oneMin)));
+        assertThat(tc.parseToMillis("1hrs"), is(equalTo(oneHour)));
+        assertThat(tc.parseToMillis("1days"), is(equalTo(oneDay)));
+        assertThat(tc.parseToMillis("1weeks"), is(equalTo(oneWeek)));
+    }
+
+    @Test
+    public void testTimeConversionIsCaseInsensitive() {
+        TimeConversion tc = TimeConversion.getInstance();
+
+        long oneMili = 1;
+        long oneSec = oneMili * 1000;
+        long oneMin = oneSec * 60;
+        long oneHour = oneMin * 60;
+        long oneDay = oneHour * 24;
+        long oneWeek = oneDay * 7;
+
+        assertThat(tc.parseToMillis("1MS"), is(equalTo(oneMili)));
+        assertThat(tc.parseToMillis("1SECS"), is(equalTo(oneSec)));
+        assertThat(tc.parseToMillis("1MINS"), is(equalTo(oneMin)));
+        assertThat(tc.parseToMillis("1HRS"), is(equalTo(oneHour)));
+        assertThat(tc.parseToMillis("1DAYS"), is(equalTo(oneDay)));
+        assertThat(tc.parseToMillis("1WEEKS"), is(equalTo(oneWeek)));
     }
 
 }
