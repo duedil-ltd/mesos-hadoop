@@ -23,7 +23,7 @@ public class Utils {
         return URI.create(masterUri.toString() + VERSION_API_PATH);
     }
 
-    public static String getEnv(String envVar) {
+    public static String getEnvOrThrow(String envVar) {
         String result = System.getenv(envVar);
 
         if (result == null) {

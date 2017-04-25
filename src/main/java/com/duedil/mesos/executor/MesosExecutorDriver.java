@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.duedil.mesos.Utils.executorEndpoint;
-import static com.duedil.mesos.Utils.getEnv;
+import static com.duedil.mesos.Utils.getEnvOrThrow;
 import static com.google.api.client.util.Preconditions.checkNotNull;
 import static org.apache.http.HttpStatus.SC_ACCEPTED;
 
@@ -50,10 +50,10 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
     public MesosExecutorDriver(Executor executor) {
         this.executor = checkNotNull(executor);
         this.framework = null;
-        this.frameworkId = FrameworkID.newBuilder().setValue(getEnv(ENV_FRAMEWORK_ID)).build();
-        this.executorId  = ExecutorID.newBuilder().setValue(getEnv(ENV_EXECUTOR_ID)).build();
+        this.frameworkId = FrameworkID.newBuilder().setValue(getEnvOrThrow(ENV_FRAMEWORK_ID)).build();
+        this.executorId  = ExecutorID.newBuilder().setValue(getEnvOrThrow(ENV_EXECUTOR_ID)).build();
         this.conn = null;
-        this.agentEndpoint = executorEndpoint(getEnv(ENV_AGENT_ENDPOINT));
+        this.agentEndpoint = executorEndpoint(getEnvOrThrow(ENV_AGENT_ENDPOINT));
         this.unacknowledgedTasks = new HashMap<>();
         this.unacknowledgedUpdates = new HashMap<>();
     }

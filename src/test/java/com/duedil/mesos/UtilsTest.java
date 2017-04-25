@@ -6,7 +6,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 
 import static com.duedil.mesos.Utils.executorEndpoint;
-import static com.duedil.mesos.Utils.getEnv;
+import static com.duedil.mesos.Utils.getEnvOrThrow;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -29,14 +29,16 @@ public class UtilsTest {
     @Test
     public void testGetEnvFetchesValueFromEnvironment() {
         String expected = "http://127.0.0.1:5050";
-        String actual = getEnv("MESOS_AGENT_ENDPOINT");
+        String actual = getEnvOrThrow("MESOS_AGENT_ENDPOINT");
         assertThat(actual, is(equalTo(expected)));
     }
 
     @SuppressWarnings("unused")
     @Test(expected = NullPointerException.class)
     public void testGetEnvThrowsNpeWhenEnvVarDoesntExist() {
-        String actual = getEnv("MESOS_FROBNITZER");
+        String actual = getEnvOrThrow("MESOS_FROBNITZER");
+    }
+
     }
 
 }
