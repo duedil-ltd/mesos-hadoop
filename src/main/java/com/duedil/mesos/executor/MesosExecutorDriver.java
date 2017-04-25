@@ -182,7 +182,14 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
     private void onError(final Event event) {
         Error error = event.getError();
         LOG.error("Agent reported error '{}'", error.getMessage());
-        // TODO: the recommendation is to abort and retry subscription
+        Status status = abort();
+        if (status != Status.DRIVER_ABORTED) {
+            throw new RuntimeException("Driver failed to abort");
+        }
+        status = start();
+        if (status != Status.DRIVER_RUNNING) {
+            throw new RuntimeException("Driver failed to start");
+        }
     }
 
     private void onShutdown(final Event event) {
