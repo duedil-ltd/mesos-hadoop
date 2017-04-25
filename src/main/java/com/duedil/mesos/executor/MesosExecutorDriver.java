@@ -153,7 +153,7 @@ public class MesosExecutorDriver implements ExecutorDriver, ActionableExecutorLi
             }
         } catch (IOException e) {
             LOG.error("Error while sending message: {}", e.getMessage());
-            backoff();
+            backoff(); // TODO: What do?
         }
 
         return Status.DRIVER_RUNNING;
