@@ -6,6 +6,9 @@ $setup = <<SCRIPT
 set -e
 
 # Setup
+HADOOP_MESOS_VERSION=0.4.0-SNAPSHOT
+HADOOP_VERSION=2.6.0
+CDH_VERSION=5.9.0
 sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF
 DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
 CODENAME=$(lsb_release -cs)
@@ -30,12 +33,12 @@ sleep 5
 (sudo service mesos-slave stop || true)
 
 # Download and extract Hadoop
-wget http://archive.cloudera.com/cdh5/cdh/5/hadoop-2.5.0-cdh5.2.0.tar.gz
-tar -zxvf hadoop-2.5.0-cdh5.2.0.tar.gz
-sudo mkdir -p /usr/local/hadoop-2.5.0
-sudo chmod +w /usr/local/hadoop-2.5.0
-mv hadoop-2.5.0-cdh5.2.0/* /usr/local/hadoop-2.5.0
-rm hadoop-2.5.0-cdh5.2.0.tar.gz
+wget http://archive.cloudera.com/cdh5/cdh/5/hadoop-${HADOOP_VERSION}-cdh${CDH_VERSION}.tar.gz
+tar -zxvf hadoop-${HADOOP_VERSION}-cdh5.9.0.tar.gz
+sudo mkdir -p /usr/local/hadoop-${HADOOP_VERSION}
+sudo chmod +w /usr/local/hadoop-${HADOOP_VERSION}
+mv hadoop-${HADOOP_VERSION}-cdh${CDH_VERSION}/* /usr/local/hadoop-${HADOOP_VERSION}
+rm hadoop-${HADOOP_VERSION}-cdh${CDH_VERSION}.tar.gz
 
 # copy across .bash_profile to set environment
 ln -s /opt/mesos-hadoop/vagrant/bash/.bash_profile /home/vagrant/.bash_profile
@@ -45,7 +48,7 @@ ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa
 cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
 
 # Update symlinks etc to point to MR1
-cd /usr/local/hadoop-2.5.0
+cd /usr/local/hadoop-${HADOOP_VERSION}
 
 mv bin bin-mapreduce2
 mv examples examples-mapreduce2
@@ -66,7 +69,7 @@ sudo mkdir -p /var/log/hadoop
 sudo chown vagrant /var/log/hadoop
 
 # ln hadoop conf files to appropriate locations
-pushd /usr/local/hadoop-2.5.0 > /dev/null
+pushd /usr/local/hadoop-${HADOOP_VERSION} > /dev/null
 sudo chown vagrant etc/hadoop
 
 rm etc/hadoop/core-site.xml
@@ -82,21 +85,21 @@ popd > /dev/null
 cd /opt/mesos-hadoop
 mvn package
 # TODO can this be version independent? can this be automated?
-cp target/hadoop-mesos-0.2.0.jar /usr/local/hadoop-2.5.0/share/hadoop/common/lib/hadoop-0.2.0.jar
+cp target/hadoop-mesos-${HADOOP_MESOS_VERSION}.jar /usr/local/hadoop-${HADOOP_VERSION}/share/hadoop/common/lib/hadoop-mesos-${HADOOP_MESOS_VERSION}.jar
 
 source /opt/mesos-hadoop/vagrant/bash/.bash_profile
 
-pushd /usr/local/hadoop-2.5.0/bin > /dev/null
+pushd /usr/local/hadoop-${HADOOP_VERSION}/bin > /dev/null
 # launch namenode/datanode (50070/50075)
 ./hadoop namenode -format
 ./hadoop-daemon.sh start namenode
 ./hadoop-daemon.sh start datanode
 
 # TODO how to make this repeatable?
-pushd /usr/local/hadoop-2.5.0 > /dev/null
-sudo tar -czf /opt/mesos-hadoop/hadoop-2.5.0-cdh5.2.0.tar.gz .
+pushd /usr/local/hadoop-${HADOOP_VERSION} > /dev/null
+sudo tar -czf /opt/mesos-hadoop/hadoop-${HADOOP_VERSION}-cdh${CDH_VERSION}.tar.gz .
 popd > /dev/null
-./hadoop fs -put /opt/mesos-hadoop/hadoop-2.5.0-cdh5.2.0.tar.gz /hadoop-2.5.0-cdh5.2.0.tar.gz
+./hadoop fs -put /opt/mesos-hadoop/hadoop-${HADOOP_VERSION}-cdh${CDH_VERSION}.tar.gz /hadoop-${HADOOP_VERSION}-cdh${CDH_VERSION}.tar.gz
 
 # launch jobtracker (50030)
 ./hadoop-daemon.sh start jobtracker

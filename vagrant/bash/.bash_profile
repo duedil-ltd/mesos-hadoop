@@ -1,6 +1,6 @@
-export PATH=/usr/local/hadoop-2.5.0/bin:/usr/local/hadoop-2.5.0/sbin:$PATH
-export HADOOP_CONF_DIR=/usr/local/hadoop-2.5.0/etc/hadoop
-export HADOOP_PREFIX=/usr/local/hadoop-2.5.0
+export PATH=/usr/local/hadoop-2.6.0/bin:/usr/local/hadoop-2.6.0/sbin:$PATH
+export HADOOP_CONF_DIR=/usr/local/hadoop-2.6.0/etc/hadoop
+export HADOOP_PREFIX=/usr/local/hadoop-2.6.0
 export HADOOP_LOG_DIR=/var/log/hadoop
 export HADOOP_USER_NAME=vagrant
 export HADOOP_NAMENODE_USER=vagrant
