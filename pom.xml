@@ -21,7 +21,7 @@
         <httpclient.version>1.22.0</httpclient.version>
         <slf4j.version>1.7.24</slf4j.version>
         <log4j.version>1.2.17</log4j.version>
-        <guava.version>21.0</guava.version>
+        <guava.version>20.0</guava.version>
         <metrics.version>3.1.0</metrics.version>
         <snappy-java.version>1.0.5</snappy-java.version>
         <!-- test deps versions -->
