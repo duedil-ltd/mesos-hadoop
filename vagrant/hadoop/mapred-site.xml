@@ -17,7 +17,7 @@
     </property>
     <property>
         <name>mapred.mesos.executor.uri</name>
-        <value>hdfs://localhost:9000/hadoop-2.5.0-cdh5.2.0.tar.gz</value>
+        <value>hdfs://localhost:9000/hadoop-2.6.0-cdh5.9.0.tar.gz</value>
     </property>
     <property>
         <name>mapred.mesos.slot.cpus</name>
