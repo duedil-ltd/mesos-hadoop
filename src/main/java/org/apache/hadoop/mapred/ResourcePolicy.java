@@ -422,12 +422,6 @@ public class ResourcePolicy {
             commandInfo.addUris(CommandInfo.URI.newBuilder().setValue(uri));
         }
 
-        // Populate old-style ContainerInfo if needed
-        String containerImage = scheduler.conf.get("mapred.mesos.container.image");
-        if (containerImage != null && !containerImage.equals("")) {
-          commandInfo.setContainer(org.apache.mesos.hadoop.Utils.buildContainerInfo(scheduler.conf));
-        }
-
         // Create a configuration from the current configuration and
         // override properties as appropriate for the TaskTracker.
         Configuration overrides = new Configuration(scheduler.conf);
@@ -469,7 +463,10 @@ public class ResourcePolicy {
                     .setType(Value.Type.SCALAR)
                     .setRole(diskRole)
                     .setScalar(Value.Scalar.newBuilder().setValue(containerDisk)))
-            .setCommand(commandInfo.build());
+            .setCommand(commandInfo.build())
+            ;
+
+
 
         // Add the docker container info if an image is specified
         String dockerImage = scheduler.conf.get("mapred.mesos.docker.image");

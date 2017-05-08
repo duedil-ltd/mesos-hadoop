@@ -14,7 +14,7 @@ import com.codahale.metrics.jvm.ThreadStatesGaugeSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobID;
 import org.apache.hadoop.mapred.JobStatus;
-import org.apache.mesos.Protos.TaskState;
+import org.apache.mesos.v1.Protos.TaskState;
 
 import java.io.File;
 import java.net.InetSocketAddress;

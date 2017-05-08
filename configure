@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+BASEDIR=$(dirname $0)
+
+function main() {
+######################################################################
+
+echo
+cat <<KEYS
+SSH Keys
+    A local public/private key pair is used to authenticate with
+    Github and other SSH services.
+    The files are copied into the local conf directory to be shared
+    within the virtual machine. The VM will copy these files into its
+    local ~/.ssh directory and set the appropriate permissions to
+    make them usable.
+    Please note that if your keys require passphrases these will be
+    prompted for now and a passphrase-less key will be copied into
+    the conf directory.
+
+KEYS
+
+[ -d $BASEDIR/conf/ssh ] || mkdir -p $BASEDIR/vagrant/ssh;
+
+readpath-exists LOCAL_KEY_PRIV "- SSH Private Key" $BASEDIR/vagrant/ssh/id_rsa $BASEDIR/vagrant/ssh/id_dsa ~/.ssh/id_rsa ~/.ssh/id_dsa
+readpath-exists LOCAL_KEY_PUB "- SSH Public Key" $BASEDIR/vagrant/ssh/id_rsa.pub $BASEDIR/vagrant/ssh/id_dsa.pub ~/.ssh/id_rsa.pub ~/.ssh/id_dsa.pub
+
+TARGET_KEY_PRIV=$BASEDIR/vagrant/ssh/id_rsa
+TARGET_KEY_PUB=$BASEDIR/vagrant/ssh/id_rsa.pub
+
+copy-conf $LOCAL_KEY_PRIV $TARGET_KEY_PRIV
+if [ $? -ne 0 ]; then
+    echo "Unable to decode key. Check source key passphrase."
+    exit 1;
+fi
+
+copy-conf $LOCAL_KEY_PUB $TARGET_KEY_PUB
+
+cat <<DONE
+That should be everything. If everything went successfully, you can
+now use \`vagrant up\` to launch the VM.
+
+DONE
+
+######################################################################
+}
+
+function copy-conf() {
+	SOURCE=$(realpath $1)
+	TARGET=$(realpath $2)
+	if [ "$TARGET" ] && [ "$SOURCE" != "$TARGET" ]; then
+        ${3:-ln -f} $SOURCE $TARGET
+	fi
+}
+
+# Usage: readpath VARIABLE PROMPT [DEFAULT [DEFAULT]]
+# Doesn't ensure that the user-specified file exists
+function readpath() {
+	# Extract parameters
+	local VARIABLE="$1"
+	local PROMPT="$2"
+	shift 2
+	while [ $# -gt 0 ]; do
+		if [ -e $1 ]; then
+			local DEFAULT=$1
+			break
+		fi
+		shift
+	done
+	[ "$DEFAULT" ] && PROMPT="$PROMPT [$DEFAULT]: " || PROMPT="$PROMPT: "
+	# Prompt user
+	P=
+	while [ ! "$P" ]; do
+		echo -n "$PROMPT"; read -e P
+		[ ! "$P" ] && P="$DEFAULT"
+	done
+	export $VARIABLE=$(echo $P | sed "s:^~/:$HOME/:")
+}
+
+# Usage: readpath-exists VARIABLE PROMPT [DEFAULT]
+# Ensures that the returned path exists
+function readpath-exists() {
+	eval $1=
+	while [ ! -e "${!1}" ]; do
+		readpath "$@"
+	done
+}
+
+# realpath shim
+[ "$(which realpath)" ] || realpath() {
+	if [ ! "$1" ]; then
+		pwd; return 0
+	elif [ -d $1 ]; then
+		BASE=
+		DIR=$1
+	else
+		BASE=$(basename $1)
+		DIR=$(dirname $1)
+	fi
+	if [ ! -e "$DIR" ]; then
+		return 1
+	fi
+	_PWD=$(pwd)
+	cd $DIR
+	DIR=$(pwd)
+	cd $_PWD
+	echo $DIR/$BASE
+}
+
+main

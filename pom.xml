@@ -4,7 +4,7 @@
 
     <groupId>org.apache.mesos</groupId>
     <artifactId>hadoop-mesos</artifactId>
-    <version>0.1.0</version>
+    <version>0.4.0-SNAPSHOT</version>
 
     <properties>
         <encoding>UTF-8</encoding>
@@ -16,11 +16,14 @@
         <commons-logging.version>1.1.3</commons-logging.version>
         <commons-httpclient.version>3.1</commons-httpclient.version>
         <hadoop-client.version>2.5.0-mr1-cdh5.2.0</hadoop-client.version>
-        <mesos.version>0.23.1</mesos.version>
-        <protobuf.version>2.5.0</protobuf.version>
+        <mesos.version>1.1.0</mesos.version>
+        <protobuf.version>3.2.0</protobuf.version>
+        <httpclient.version>1.22.0</httpclient.version>
+        <slf4j.version>1.7.24</slf4j.version>
+        <log4j.version>1.2.17</log4j.version>
+        <guava.version>20.0</guava.version>
         <metrics.version>3.1.0</metrics.version>
         <snappy-java.version>1.0.5</snappy-java.version>
-
         <!-- test deps versions -->
         <junit.version>4.11</junit.version>
         <mockito.version>1.9.5</mockito.version>
@@ -112,12 +115,55 @@
           <artifactId>snappy-java</artifactId>
           <version>${snappy-java.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java-util</artifactId>
+            <version>${protobuf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.http-client</groupId>
+            <artifactId>google-http-client</artifactId>
+            <version>${httpclient.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.http-client</groupId>
+            <artifactId>google-http-client-protobuf</artifactId>
+            <version>${httpclient.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+
+
 
         <!-- Test scope -->
         <dependency>
           <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -134,7 +180,18 @@
                     <showWarnings>true</showWarnings>
                 </configuration>
             </plugin>
-
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.19.1</version>
+                <configuration>
+                    <environmentVariables>
+                        <MESOS_FRAMEWORK_ID>fr4m3w0rk-1d</MESOS_FRAMEWORK_ID>
+                        <MESOS_EXECUTOR_ID>3x3cut0r-1d</MESOS_EXECUTOR_ID>
+                        <MESOS_AGENT_ENDPOINT>http://127.0.0.1:5050</MESOS_AGENT_ENDPOINT>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

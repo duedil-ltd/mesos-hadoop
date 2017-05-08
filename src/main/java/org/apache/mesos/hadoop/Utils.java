@@ -1,21 +1,25 @@
 
 package org.apache.mesos.hadoop;
 
-import javax.xml.transform.*;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
-import java.lang.IllegalArgumentException;
-import java.io.*;
-
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.Configuration;
-
-import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo;
 import org.apache.mesos.Protos.Parameter;
-import org.apache.mesos.Protos.Parameters;
 import org.apache.mesos.Protos.Volume;
+
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Source;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 
 public class Utils {
 
@@ -41,26 +45,6 @@ public class Utils {
 
     byte[] bytes = baos.toByteArray();
     return ByteString.copyFrom(bytes);
-  }
-
-  public static CommandInfo.ContainerInfo buildContainerInfo(Configuration conf) {
-    String containerImage = conf.get("mapred.mesos.container.image");
-    String[] containerOptions = conf.getStrings("mapred.mesos.container.options");
-
-    CommandInfo.ContainerInfo.Builder containerInfo =
-        CommandInfo.ContainerInfo.newBuilder();
-
-    if (containerImage != null) {
-      containerInfo.setImage(containerImage);
-    }
-
-    if (containerOptions != null) {
-      for (int i = 0; i < containerOptions.length; i++) {
-        containerInfo.addOptions(containerOptions[i]);
-      }
-    }
-
-    return containerInfo.build();
   }
 
   public static ContainerInfo buildDockerContainerInfo(Configuration conf) {

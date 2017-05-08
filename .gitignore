@@ -3,3 +3,7 @@ target
 .idea/
 *.iml
 *-pom.xml
+
+# Vagrant files
+.vagrant/*
+vagrant/ssh/*
