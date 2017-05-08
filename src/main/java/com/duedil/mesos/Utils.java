@@ -62,12 +62,12 @@ public class Utils {
             throw new IllegalArgumentException();
         }
 
-        private final static long MILLIS_IN_MILLISECOND = 1;
-        private final static long MILLIS_IN_SECOND = MILLIS_IN_MILLISECOND * 1000;
-        private final static long MILLIS_IN_MINUTE = MILLIS_IN_SECOND * 60;
-        private final static long MILLIS_IN_HOUR = MILLIS_IN_MINUTE * 60;
-        private final static long MILLIS_IN_DAY = MILLIS_IN_HOUR * 24;
-        private final static long MILLIS_IN_WEEK = MILLIS_IN_DAY * 7;
+        public final static long MILLIS_IN_MILLISECOND = 1;
+        public final static long MILLIS_IN_SECOND = MILLIS_IN_MILLISECOND * 1000;
+        public final static long MILLIS_IN_MINUTE = MILLIS_IN_SECOND * 60;
+        public final static long MILLIS_IN_HOUR = MILLIS_IN_MINUTE * 60;
+        public final static long MILLIS_IN_DAY = MILLIS_IN_HOUR * 24;
+        public final static long MILLIS_IN_WEEK = MILLIS_IN_DAY * 7;
 
         private enum Conversion {
             MS(MILLIS_IN_MILLISECOND),

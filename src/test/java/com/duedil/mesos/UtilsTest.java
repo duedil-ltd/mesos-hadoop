@@ -6,8 +6,14 @@ import org.junit.Test;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import static com.duedil.mesos.Utils.TimeConversion.MILLIS_IN_DAY;
+import static com.duedil.mesos.Utils.TimeConversion.MILLIS_IN_HOUR;
+import static com.duedil.mesos.Utils.TimeConversion.MILLIS_IN_MINUTE;
+import static com.duedil.mesos.Utils.TimeConversion.MILLIS_IN_SECOND;
+import static com.duedil.mesos.Utils.TimeConversion.MILLIS_IN_WEEK;
 import static com.duedil.mesos.Utils.executorEndpoint;
 import static com.duedil.mesos.Utils.getEnvOrThrow;
+import static com.duedil.mesos.Utils.TimeConversion.MILLIS_IN_MILLISECOND;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -44,19 +50,12 @@ public class UtilsTest {
     public void testTimeConversionHoldsAllUnits() {
         TimeConversion tc = TimeConversion.getInstance();
 
-        long oneMili = 1;
-        long oneSec = oneMili * 1000;
-        long oneMin = oneSec * 60;
-        long oneHour = oneMin * 60;
-        long oneDay = oneHour * 24;
-        long oneWeek = oneDay * 7;
-
-        assertThat(tc.parseToMillis("1ms"), is(equalTo(oneMili)));
-        assertThat(tc.parseToMillis("1secs"), is(equalTo(oneSec)));
-        assertThat(tc.parseToMillis("1mins"), is(equalTo(oneMin)));
-        assertThat(tc.parseToMillis("1hrs"), is(equalTo(oneHour)));
-        assertThat(tc.parseToMillis("1days"), is(equalTo(oneDay)));
-        assertThat(tc.parseToMillis("1weeks"), is(equalTo(oneWeek)));
+        assertThat(tc.parseToMillis("1ms"), is(equalTo(MILLIS_IN_MILLISECOND)));
+        assertThat(tc.parseToMillis("1secs"), is(equalTo(MILLIS_IN_SECOND)));
+        assertThat(tc.parseToMillis("1mins"), is(equalTo(MILLIS_IN_MINUTE)));
+        assertThat(tc.parseToMillis("1hrs"), is(equalTo(MILLIS_IN_HOUR)));
+        assertThat(tc.parseToMillis("1days"), is(equalTo(MILLIS_IN_DAY)));
+        assertThat(tc.parseToMillis("1weeks"), is(equalTo(MILLIS_IN_WEEK)));
     }
 
     @Test
