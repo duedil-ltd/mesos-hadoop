@@ -40,13 +40,13 @@ in the near future!
 #### Package ####
 
 You'll need to download an existing Hadoop distribution. For this
-guide, we'll use [CDH5][CDH5.1.3]. First grab the tar archive and
+guide, we'll use [CDH5][CDH5.9]. First grab the tar archive and
 extract it.
 
 ```shell
-wget http://archive.cloudera.com/cdh5/cdh/5/hadoop-2.5.0-cdh5.2.0.tar.gz
+wget http://archive.cloudera.com/cdh5/cdh/5/hadoop-2.6.0-cdh5.9.0.tar.gz
 ...
-tar zxf hadoop-2.5.0-cdh5.2.0.tar.gz
+tar zxf hadoop-2.6.0-cdh5.9.0.tar.gz
 ```
 
 > **Take note**, the extracted directory is `hadoop-2.5.0-cdh5.2.0`.
@@ -54,14 +54,14 @@ tar zxf hadoop-2.5.0-cdh5.2.0.tar.gz
 Now copy `hadoop-mesos-0.2.0.jar` into the `share/hadoop/common/lib` folder.
 
 ```shell
-cp /path/to/hadoop-mesos-0.2.0.jar hadoop-2.5.0-cdh5.2.0/share/hadoop/common/lib/
+cp /path/to/hadoop-mesos-0.3.0.jar hadoop-2.6.0-cdh5.9.0/share/hadoop/common/lib/
 ```
 
 Since CDH5 includes both MRv1 and MRv2 (YARN) and is configured for YARN by
 default, we need update the symlinks to point to the correct directories.
 
 ```shell
-cd hadoop-2.5.0-cdh5.2.0
+cd hadoop-2.6.0-cdh5.9.0
 
 mv bin bin-mapreduce2
 mv examples examples-mapreduce2 
@@ -81,7 +81,7 @@ popd
 
 _That's it!_ You now have a _Hadoop on Mesos_ distribution!
 
-[CDH5.1.3]: http://www.cloudera.com/content/support/en/documentation/cdh5-documentation/cdh5-documentation-v5-latest.html
+[CDH5.9]: https://www.cloudera.com/documentation/enterprise/release-notes/topics/cdh_vd_cdh_package_tarball_59.html#tarball_59x
 
 #### Upload ####
 
