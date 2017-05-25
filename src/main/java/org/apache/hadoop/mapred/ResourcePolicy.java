@@ -7,8 +7,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.util.StringUtils;
-import com.google.protobuf.ByteString;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.CommandInfo;
 import org.apache.mesos.v1.Protos.ExecutorID;
@@ -367,7 +365,7 @@ public class ResourcePolicy {
 
         String jvmOpts = scheduler.conf.get("mapred.mesos.executor.jvm.opts");
         if (jvmOpts == null) {
-            jvmOpts = StringUtils.join(" ", defaultJvmOpts);
+            jvmOpts = join(" ", defaultJvmOpts);
         }
 
         // Set up the environment for running the TaskTracker.

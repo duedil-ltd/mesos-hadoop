@@ -1,12 +1,15 @@
 package org.apache.hadoop.mapred;
 
 import com.codahale.metrics.Meter;
+import com.duedil.mesos.MesosSchedulerDriver;
+import com.duedil.mesos.Scheduler;
+import com.duedil.mesos.SchedulerDriver;
+import com.google.protobuf.ByteString;
 import org.apache.commons.httpclient.HttpHost;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
-import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.hadoop.Metrics;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.AgentID;
@@ -198,7 +201,7 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
         .setName("Hadoop: (RPC port: " + jobTracker.port + ","
                  + " WebUI port: " + jobTracker.infoPort + ")").build();
 
-      driver = new MesosSchedulerDriver(this, frameworkInfo, master);
+      driver = new MesosSchedulerDriver(this, frameworkInfo, new URI(master));
       driver.start();
     } catch (Exception e) {
       // If the MesosScheduler can't be loaded, the JobTracker won't be useful
@@ -235,7 +238,7 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
   public synchronized void terminate() throws IOException {
     try {
       LOG.info("Stopping MesosScheduler");
-      driver.stop();
+      driver.stop(false);
     } catch (Exception e) {
       LOG.error("Failed to stop Mesos scheduler", e);
     }
