@@ -1,19 +1,36 @@
 package org.apache.hadoop.mapred;
 
+import com.duedil.mesos.SchedulerDriver;
+import com.google.protobuf.ByteString;
 import org.apache.commons.httpclient.HttpHost;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.*;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.SchedulerDriver;
-import com.google.protobuf.ByteString;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.CommandInfo;
+import org.apache.mesos.v1.Protos.ExecutorID;
+import org.apache.mesos.v1.Protos.ExecutorInfo;
+import org.apache.mesos.v1.Protos.Filters;
+import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.OfferID;
+import org.apache.mesos.v1.Protos.Resource;
+import org.apache.mesos.v1.Protos.TaskID;
+import org.apache.mesos.v1.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos.Value;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.apache.hadoop.util.StringUtils.join;
 
@@ -213,11 +230,11 @@ public class ResourcePolicy {
 
     synchronized (this) {
       computeNeededSlots(jobsInProgress, taskTrackers);
-
       // Launch TaskTrackers to satisfy the slot requirements.
       for (Offer offer : offers) {
+        List<OfferID> offerIDs = Arrays.asList(offer.getId());
         if (neededMapSlots <= 0 && neededReduceSlots <= 0) {
-          schedulerDriver.declineOffer(offer.getId());
+          schedulerDriver.declineOffers(offerIDs, Filters.getDefaultInstance());
           continue;
         }
 
@@ -276,7 +293,7 @@ public class ResourcePolicy {
               !portsRole.equals(expectedRole)) {
             LOG.info("Declining offer with invalid role " + expectedRole);
 
-            schedulerDriver.declineOffer(offer.getId());
+            schedulerDriver.declineOffers(offerIDs, Filters.getDefaultInstance());
             continue;
           }
         }
@@ -297,7 +314,7 @@ public class ResourcePolicy {
                   ? " less than 2 offered"
                   : " at least 2 (sufficient)"))));
 
-          schedulerDriver.declineOffer(offer.getId());
+          schedulerDriver.declineOffers(offerIDs, Filters.getDefaultInstance());
           continue;
         }
 
@@ -320,7 +337,7 @@ public class ResourcePolicy {
               "  disk: offered " + disk + " needed " + taskDisk,
               "  ports: " + ports)));
 
-          schedulerDriver.declineOffer(offer.getId());
+          schedulerDriver.declineOffers(offerIDs, Filters.getDefaultInstance());
           continue;
         }
 
@@ -491,16 +508,17 @@ public class ResourcePolicy {
           LOG.error("Caught exception serializing configuration");
 
           // Skip this offer completely
-          schedulerDriver.declineOffer(offer.getId());
+          schedulerDriver.declineOffers(offerIDs, Filters.getDefaultInstance());
           continue;
         }
+        LOG.debug("Built task data");
 
         // Create the TaskTracker TaskInfo
         TaskInfo trackerTaskInfo = TaskInfo
             .newBuilder()
             .setName(taskId.getValue())
             .setTaskId(taskId)
-            .setSlaveId(offer.getSlaveId())
+            .setAgentId(offer.getAgentId())
             .addResources(
                 Resource
                     .newBuilder()
@@ -547,8 +565,7 @@ public class ResourcePolicy {
         LOG.debug("Tracker added to Mesos tasks");
 
         // Launch the task
-        schedulerDriver.launchTasks(Arrays.asList(offer.getId()), Arrays.asList(trackerTaskInfo));
-        LOG.debug("Task launched");
+        schedulerDriver.launchTasks(offerIDs, Arrays.asList(trackerTaskInfo), Filters.getDefaultInstance());
 
         neededMapSlots -= mapSlots;
         neededReduceSlots -= reduceSlots;

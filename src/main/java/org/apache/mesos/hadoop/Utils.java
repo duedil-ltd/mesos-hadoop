@@ -3,10 +3,10 @@ package org.apache.mesos.hadoop;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.mesos.Protos.ContainerInfo;
-import org.apache.mesos.Protos.ContainerInfo.DockerInfo;
-import org.apache.mesos.Protos.Parameter;
-import org.apache.mesos.Protos.Volume;
+import org.apache.mesos.v1.Protos.ContainerInfo;
+import org.apache.mesos.v1.Protos.ContainerInfo.DockerInfo;
+import org.apache.mesos.v1.Protos.Parameter;
+import org.apache.mesos.v1.Protos.Volume;
 
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Source;

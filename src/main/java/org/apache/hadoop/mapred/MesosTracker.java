@@ -3,7 +3,7 @@ package org.apache.hadoop.mapred;
 import org.apache.commons.httpclient.HttpHost;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.v1.Protos.TaskID;
 
 import java.util.Collection;
 import java.util.Collections;

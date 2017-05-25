@@ -7,11 +7,15 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.server.jobtracker.TaskTracker;
 import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.*;
-import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.hadoop.Metrics;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.AgentID;
+import org.apache.mesos.v1.Protos.ExecutorID;
+import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.FrameworkInfo;
+import org.apache.mesos.v1.Protos.MasterInfo;
+import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.OfferID;
 
 import java.io.File;
 import java.io.IOException;
@@ -418,8 +422,8 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
 
   @Override
   public synchronized void frameworkMessage(SchedulerDriver schedulerDriver,
-                                            ExecutorID executorID, SlaveID slaveID, byte[] bytes) {
-    LOG.info("Framework Message of " + bytes.length + " bytes"
+                                            ExecutorID executorID, AgentID slaveID, ByteString bytes) {
+    LOG.info("Framework Message of " + bytes.size() + " bytes"
         + " from executor " + executorID.getValue()
         + " on slave " + slaveID.getValue());
   }
@@ -430,14 +434,14 @@ public class MesosScheduler extends TaskScheduler implements Scheduler {
   }
 
   @Override
-  public synchronized void slaveLost(SchedulerDriver schedulerDriver,
-                                     SlaveID slaveID) {
+  public synchronized void agentLost(SchedulerDriver schedulerDriver,
+                                     AgentID slaveID) {
     LOG.warn("Slave lost: " + slaveID.getValue());
   }
 
   @Override
   public synchronized void executorLost(SchedulerDriver schedulerDriver,
-                                        ExecutorID executorID, SlaveID slaveID, int status) {
+                                        ExecutorID executorID, AgentID slaveID, int status) {
     LOG.warn("Executor " + executorID.getValue()
         + " lost with status " + status + " on slave " + slaveID);
   }
