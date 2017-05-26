@@ -413,6 +413,7 @@ public class ResourcePolicy {
         if (command == null || command.equals("")) {
           command = "env ; ./bin/hadoop org.apache.hadoop.mapred.MesosExecutor";
         }
+        LOG.debug("Built command: " + command);
 
         CommandInfo.Builder commandInfo = CommandInfo.newBuilder();
         commandInfo
@@ -421,6 +422,7 @@ public class ResourcePolicy {
         if (uri != null) {
             commandInfo.addUris(CommandInfo.URI.newBuilder().setValue(uri));
         }
+        LOG.debug("Built command info with value " + commandInfo.getValue());
 
         // Create a configuration from the current configuration and
         // override properties as appropriate for the TaskTracker.
@@ -465,19 +467,26 @@ public class ResourcePolicy {
                     .setScalar(Value.Scalar.newBuilder().setValue(containerDisk)))
             .setCommand(commandInfo.build())
             ;
-
-
+        if (LOG.isDebugEnabled()) {
+          StringBuilder message = new StringBuilder("Built executor with ID " + executorBuilder.getExecutorId());
+          for (Resource resource : executorBuilder.getResourcesList()) {
+            message.append(", " + resource.getName() + ": " + resource.getScalar().toString());
+          }
+          LOG.debug(message);
+        }
 
         // Add the docker container info if an image is specified
         String dockerImage = scheduler.conf.get("mapred.mesos.docker.image");
         if (dockerImage != null && !dockerImage.equals("")) {
           executorBuilder.setContainer(org.apache.mesos.hadoop.Utils.buildDockerContainerInfo(scheduler.conf));
         }
+        LOG.debug("Docker image is " + executorBuilder.getContainer().getDocker().getImage());
 
         ByteString taskData;
 
         try {
           taskData = org.apache.mesos.hadoop.Utils.confToBytes(overrides);
+          LOG.debug("Task data created");
         } catch (IOException e) {
           LOG.error("Caught exception serializing configuration");
 
@@ -524,13 +533,22 @@ public class ResourcePolicy {
             .setData(taskData)
             .setExecutor(executorBuilder.build())
             .build();
+        if (LOG.isDebugEnabled()) {
+          StringBuilder message = new StringBuilder("Built task tracker info for task " + taskId.getValue());
+          for (Resource resource : trackerTaskInfo.getResourcesList()) {
+            message.append(", " + resource.getName() + ": " + resource.toString());
+          }
+          LOG.debug(message);
+        }
 
         // Add this tracker to Mesos tasks.
         scheduler.mesosTrackers.put(httpAddress, new MesosTracker(httpAddress, taskId,
             mapSlots, reduceSlots, scheduler));
+        LOG.debug("Tracker added to Mesos tasks");
 
         // Launch the task
         schedulerDriver.launchTasks(Arrays.asList(offer.getId()), Arrays.asList(trackerTaskInfo));
+        LOG.debug("Task launched");
 
         neededMapSlots -= mapSlots;
         neededReduceSlots -= reduceSlots;
